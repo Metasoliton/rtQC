@@ -277,6 +277,7 @@ fig.Visible = 'on';
             preproc_data.rair_fn = [d filesep 'rc6' f e];
         else
             preproc_data = preRtPreProc(functional0_fn, structural_fn, spm_dir);
+            transform_ROIs_from_MNI_to_native_space = (gui_data.structural_fn, output.inverse_transformation, gui_data.ROI1_fn, gui_data.ROI2_fn);   % <<<--- function needs to be defined
         end
         
         % Create binary GM, WM and CSF masks

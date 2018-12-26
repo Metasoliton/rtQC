@@ -38,6 +38,7 @@ fig = figure('Visible','off',...
     'outerposition', [0 0 1 1],...
     'MenuBar', 'none',...
     'ToolBar', 'none');
+
 % Main data structure
 gui_data = guidata(fig);
 % Get rtQC defaults
@@ -73,6 +74,22 @@ gui_data.pb_structural_pre.Callback = @setStructural;
 gui_data.edit_functional_pre.Callback = @editFunctional;
 gui_data.pb_functional_pre.Callback = @setFunctional;
 gui_data.pb_preproc.Callback = @runPreProc;
+
+
+ gui_data.edit_ROI1.Callback = @editROI1;
+ gui_data.pb_ROI1.Callback = @setROI1;
+ gui_data.edit_ROI2.Callback = @editROI2;
+ gui_data.pb_ROI2.Callback =  @setROI2;
+ gui_data.edit_DATA1.Callback =  @editDATA1;
+ gui_data.pb_DATA1.Callback =  @setDATA1;
+ gui_data.edit_DATA2.Callback =  @editDATA2;
+ gui_data.pb_DATA2.Callback =  @setDATA2;
+ gui_data.edit_RES1.Callback = @editRES1;
+ gui_data.pb_RES1.Callback =  @setRES1;
+ gui_data.edit_RES2.Callback =  @editRES2;
+ gui_data.pb_RES2.Callback =  @setRES2;
+ 
+
 
 set(findall(fig, '-property', 'Interruptible'), 'Interruptible', 'on')
 
@@ -198,15 +215,16 @@ end
 
 
 
-
-
-
 function runPreProc(hObject,eventdata)
 fig = ancestor(hObject,'figure');
 gui_data = guidata(fig);
 gui_data.functional0_fn = [gui_data.functional4D_fn ',1'];
 % Preprocess structural and f0 images
 [d, f, e] = fileparts(gui_data.structural_fn);
+
+[d_ROI1, f_ROI1, e_ROI1] = fileparts(gui_data.ROI1_fn);     % <<<---
+[d_ROI2, f_ROI2, e_ROI2] = fileparts(gui_data.ROI2_fn);
+
 if exist([d filesep 'rc1' f e], 'file')
     % 1) If preprocessing has already been done, assign variables
     gui_data.preProc_status = 1;
@@ -218,6 +236,10 @@ if exist([d filesep 'rc1' f e], 'file')
     gui_data.bone_fn = [d filesep 'c4' f e];
     gui_data.soft_fn = [d filesep 'c5' f e];
     gui_data.air_fn = [d filesep 'c6' f e];
+    
+    gui_data.ROI1_fn = [d_ROI1 filesep f_ROI1 e_ROI1];  % <<<---
+    gui_data.ROI2_fn = [d_ROI2 filesep f_ROI2 e_ROI2];    
+    
     gui_data.rstructural_fn = [d filesep 'r' f e];
     gui_data.rgm_fn = [d filesep 'rc1' f e];
     gui_data.rwm_fn = [d filesep 'rc2' f e];
@@ -231,12 +253,23 @@ if exist([d filesep 'rc1' f e], 'file')
     gui_data.txt_preproc2_status.String = char(hex2dec('2713'));
     gui_data.preProc_step3_status = 1;
     gui_data.txt_preproc3_status.String = char(hex2dec('2713'));
+
+    gui_data.rROI1_fn = [d_ROI1 filesep 'r' f_ROI1 e_ROI1];  % <<<---
+    gui_data.rROI2_fn = [d_ROI2 filesep 'r' f_ROI2 e_ROI2];    
+
 else
     % 2) If not done, run scripts to get data in correct formats for
     % real-time processing
     gui_data.preProc_status = 0;
     guidata(fig,gui_data);
     output = preRtPreProc(fig, gui_data.functional0_fn, gui_data.structural_fn, gui_data.spm_dir);
+    
+    output = transform_ROIs_from_MNI_to_native_space(output, gui_data.ROI1_fn, gui_data.ROI2_fn);   % <<<--- function needs to be defined
+    % must result in:
+        %output.rROI1_fn = [d_ROI1 filesep 'r' f_ROI1 e_ROI1];
+        %output.rROI2_fn = [d_ROI2 filesep 'r' f_ROI2 e_ROI2;
+
+    
     for fn = fieldnames(output)'
         gui_data.(fn{1}) = output.(fn{1});
     end
@@ -246,7 +279,143 @@ guidata(fig,gui_data);
 end
 
 
+%% Pre-NF tab: Select ROIs panel
 
+% ROI1
+function editROI1(hObject,eventdata)
+fig = ancestor(hObject,'figure');
+gui_data = guidata(fig);
+end
+
+function setROI1(hObject,eventdata)
+fig = ancestor(hObject,'figure');
+gui_data = guidata(fig);
+cd(gui_data.root_dir)
+[filename, pathname] = uigetfile('*.nii', 'Select the ROI #1 IMAGE file');
+if filename ~= 0
+    gui_data.ROI1_fn = [pathname filename];
+    gui_data.edit_ROI1.String = gui_data.ROI1_fn;
+    gui_data.edit_ROI1_pre.String = gui_data.ROI1_fn; % <<<---
+end
+assignin('base', 'gui_data', gui_data)
+guidata(fig, gui_data);
+end
+
+
+% ROI2
+function editROI2(hObject,eventdata)
+fig = ancestor(hObject,'figure');
+gui_data = guidata(fig);
+end
+
+function setROI2(hObject,eventdata)
+fig = ancestor(hObject,'figure');
+gui_data = guidata(fig);
+cd(gui_data.root_dir)
+[filename, pathname] = uigetfile('*.nii', 'Select the ROI #2 IMAGE file');
+if filename ~= 0
+    gui_data.ROI2_fn = [pathname filename];
+    gui_data.edit_ROI2.String = gui_data.ROI2_fn;
+    gui_data.edit_ROI2_pre.String = gui_data.ROI2_fn;
+end
+assignin('base', 'gui_data', gui_data)
+guidata(fig, gui_data);
+end
+
+
+%% Pre-NF tab: Compare Data panel
+% DATA1
+function editDATA1(hObject,eventdata)
+fig = ancestor(hObject,'figure');
+gui_data = guidata(fig);
+end
+
+function setDATA1(hObject,eventdata)
+fig = ancestor(hObject,'figure');
+gui_data = guidata(fig);
+cd(gui_data.root_dir)
+[filename, pathname] = uigetfile('*.nii', 'Select the #1 DATA 4D IMAGE file');
+if filename ~= 0
+    gui_data.DATA1_fn = [pathname filename];
+    gui_data.edit_DATA1.String = gui_data.DATA1_fn;
+    gui_data.edit_DATA1_pre.String = gui_data.DATA1_fn;
+end
+assignin('base', 'gui_data', gui_data)
+guidata(fig, gui_data);
+end
+
+% DATA2
+function editDATA2(hObject,eventdata)
+fig = ancestor(hObject,'figure');
+gui_data = guidata(fig);
+end
+
+function setDATA2(hObject,eventdata)
+fig = ancestor(hObject,'figure');
+gui_data = guidata(fig);
+cd(gui_data.root_dir)
+[filename, pathname] = uigetfile('*.nii', 'Select the #2 DATA 4D IMAGE file');
+if filename ~= 0
+    gui_data.DATA2_fn = [pathname filename];
+    gui_data.edit_DATA2.String = gui_data.DATA2_fn;
+    gui_data.edit_DATA2_pre.String = gui_data.DATA2_fn;
+end
+assignin('base', 'gui_data', gui_data)
+guidata(fig, gui_data);
+end
+
+
+%% Post-NF tab: Compare Results panel
+
+% RES1
+function editRES1(hObject,eventdata)
+fig = ancestor(hObject,'figure');
+gui_data = guidata(fig);
+end
+
+function setRES1(hObject,eventdata)
+fig = ancestor(hObject,'figure');
+gui_data = guidata(fig);
+cd(gui_data.root_dir)
+[filename, pathname] = uigetfile('*.nii', 'Select the #1 RESULTS IMAGE file');
+if filename ~= 0
+    gui_data.RES1_fn = [pathname filename];
+    gui_data.edit_RES1.String = gui_data.RES1_fn;
+    gui_data.edit_RES1_pre.String = gui_data.RES1_fn;
+end
+assignin('base', 'gui_data', gui_data)
+guidata(fig, gui_data);
+end
+
+
+% RES2
+function editRES2(hObject,eventdata)
+fig = ancestor(hObject,'figure');
+gui_data = guidata(fig);
+end
+
+function setRES2(hObject,eventdata)
+fig = ancestor(hObject,'figure');
+gui_data = guidata(fig);
+cd(gui_data.root_dir)
+[filename, pathname] = uigetfile('*.nii', 'Select the #2 RESULTS IMAGE file');
+if filename ~= 0
+    gui_data.RES2_fn = [pathname filename];
+    gui_data.edit_RES2.String = gui_data.RES2_fn;
+    gui_data.edit_RES2_pre.String = gui_data.RES2_fn;
+end
+assignin('base', 'gui_data', gui_data)
+guidata(fig, gui_data);
+end
+
+%%
+
+
+
+
+
+
+%% Initialize 
 function initialize(hObject,eventdata)
 fig = ancestor(hObject,'figure');
 gui_data = guidata(fig);
@@ -295,18 +464,27 @@ end
 gui_data.FD = nan(gui_data.Nt,1);
 gui_data.DVARS = nan(1,gui_data.Nt);
 gui_data.T = zeros(gui_data.Nt,8); % Timing vector: 1)realignment, 2)FD, 3)DVARS, 4)smoothing, 5)detrending, 6)PSC, 7)draw stuff, 8)total
+
 % Create binary GM, WM and CSF masks
 [gui_data.GM_img_bin, gui_data.WM_img_bin, gui_data.CSF_img_bin] = createBinarySegments(gui_data.rgm_fn, gui_data.rwm_fn, gui_data.rcsf_fn, 0.1);
+
+[gui_data.ROI1_img_bin, gui_data.ROI2_img_bin] = createBinaryROI(gui_data.rROI1_fn, gui_data.rROI2_fn);  % <<<--- function must be defined
+
 % Initialize variables for real-time processing
 gui_data.I_GM = find(gui_data.GM_img_bin);
 gui_data.I_WM = find(gui_data.WM_img_bin);
 gui_data.I_CSF = find(gui_data.CSF_img_bin);
+
+gui_data.I_ROI1 = find(gui_data.ROI1_img_bin);  % <<<--- 
+gui_data.I_ROI2 = find(gui_data.ROI2_img_bin);
+
 gui_data.mask_reshaped = gui_data.GM_img_bin | gui_data.WM_img_bin | gui_data.CSF_img_bin;
+
 gui_data.I_mask = find(gui_data.mask_reshaped);
 gui_data.N_maskvox = numel(gui_data.I_mask);
 gui_data.N_vox = gui_data.Ni*gui_data.Nj*gui_data.Nk;
 gui_data.line1_pos = numel(gui_data.I_GM);
-gui_data.line2_pos = numel(gui_data.I_GM) + numel(gui_data.I_WM);
+gui_data.line2_pos = numel(gui_data.I_GM) + numel(gui_data.I_WM);       % <<<--- ???
 % Initialize variables to be updated during each real-time iteration
 gui_data.F_realigned = zeros(gui_data.N_vox, gui_data.Nt);
 gui_data.F_smoothed = zeros(gui_data.N_vox, gui_data.Nt);
@@ -324,6 +502,10 @@ gui_data.tSNR = nan(1, gui_data.Nt);
 gui_data.tSNR_gm = nan(1, gui_data.Nt);
 gui_data.tSNR_wm = nan(1, gui_data.Nt);
 gui_data.tSNR_csf = nan(1, gui_data.Nt);
+
+gui_data.tSNR_ROI1 = nan(1, gui_data.Nt);  %<<<---
+gui_data.tSNR_ROI1 = nan(1, gui_data.Nt);
+
 gui_data.X_MP_detrending = (1:gui_data.Nt)';
 gui_data.X_MP_detrending = gui_data.X_MP_detrending - mean(gui_data.X_MP_detrending); % demean non-constant regressors
 gui_data.X_MP_detrending = [gui_data.X_MP_detrending ones(gui_data.Nt,1)]; % add constant regressor
@@ -355,8 +537,10 @@ CSF_img = gui_data.F_theplot(gui_data.I_CSF, :);
 all_img = [GM_img; WM_img; CSF_img];
 gui_data.img_thePlot = imagesc(gui_data.ax_thePlot, all_img); colormap(gray); caxis([-5 5]);
 hold on;
-gui_data.plot_line1 = line([1 gui_data.Nt],[gui_data.line1_pos gui_data.line1_pos],  'Color', 'b', 'LineWidth', 2 );
+
+gui_data.plot_line1 = line([1 gui_data.Nt],[gui_data.line1_pos gui_data.line1_pos],  'Color', 'b', 'LineWidth', 2 );    % <<<--- ???
 gui_data.plot_line2 = line([1 gui_data.Nt],[gui_data.line2_pos gui_data.line2_pos],  'Color', 'g', 'LineWidth', 2 );
+
 hold off;
 removeAxesTicks(gui_data.ax_volumes);
 gui_data.RT_status = 'initialized';
@@ -369,7 +553,7 @@ end
 
 
 
-
+%% Start RT
 function startRT(hObject,eventdata)
 
 fig = ancestor(hObject,'figure');
@@ -522,8 +706,11 @@ while gui_data.i < (gui_data.Nt+1)
     gui_data.tSNR(gui_data.i) = mean(gui_data.F_tSNR(gui_data.I_mask, gui_data.i));
     gui_data.tSNR_gm(gui_data.i) = mean(gui_data.F_tSNR(gui_data.I_GM, gui_data.i));
     gui_data.tSNR_wm(gui_data.i) = mean(gui_data.F_tSNR(gui_data.I_WM, gui_data.i));
-    gui_data.tSNR_csf(gui_data.i) = mean(gui_data.F_tSNR(gui_data.I_CSF, gui_data.i));
+    gui_data.tSNR_csf(gui_data.i) = mean(gui_data.F_tSNR(gui_data.I_CSF, gui_data.i));  
     
+    gui_data.tSNR_ROI1(gui_data.i) = mean(gui_data.F_tSNR(gui_data.I_ROI1, gui_data.i));  % <<<---
+    gui_data.tSNR_ROI2(gui_data.i) = mean(gui_data.F_tSNR(gui_data.I_ROI2, gui_data.i));  
+        
     if fd >= gui_data.FD_threshold
         gui_data.outlier_counter = gui_data.outlier_counter + 1;
         gui_data.FD_outliers = [gui_data.FD_outliers gui_data.i];
@@ -542,8 +729,8 @@ while gui_data.i < (gui_data.Nt+1)
     gui_data.txt_fdave.String = ['Mean FD:  ' num2str(gui_data.FD_dynamic_average)];
     gui_data.txt_tsnr.String = ['tSNR (brain):  ' num2str(gui_data.tSNR(gui_data.i))];
     gui_data.txt_tsnr_gm.String = ['tSNR (GM):  ' num2str(gui_data.tSNR_gm(gui_data.i))];
-    gui_data.txt_tsnr_wm.String = ['tSNR (WM):  ' num2str(gui_data.tSNR_wm(gui_data.i))];
-    gui_data.txt_tsnr_csf.String = ['tSNR (CSF):  ' num2str(gui_data.tSNR_csf(gui_data.i))];
+    gui_data.txt_tsnr_wm.String = ['tSNR (ROI 1):  ' num2str(gui_data.tSNR_wm(gui_data.i))];
+    gui_data.txt_tsnr_csf.String = ['tSNR (ROI 2):  ' num2str(gui_data.tSNR_csf(gui_data.i))];
     
     t7_start = clock;
     
@@ -579,7 +766,7 @@ gui_data.RT_status = 'completed';
 
 end
 
-
+%% Stop RT
 function stopRT(hObject,eventdata)
 fig = ancestor(hObject,'figure');
 gui_data = guidata(fig);
@@ -591,6 +778,8 @@ assignin('base', 'gui_data', gui_data)
 guidata(fig,gui_data);
 end
 
+
+%% Draw
 
 function drawFD(fig)
 gui_data = guidata(fig);
@@ -627,6 +816,8 @@ drawnow;
 % guidata(fig, gui_data);
 end
 
+
+%% Misc
 
 function setDim(hObject,eventdata)
 % fig = ancestor(hObject,'figure');
@@ -678,6 +869,8 @@ gui_data.sld_slice.Max = gui_data.Ndims(gui_data.popup_setDim.Value);
 
 end
 
+
+%% Draw brains
 function drawBrains(fig)
 gui_data = guidata(fig);
 
@@ -706,7 +899,7 @@ end
 
 
 
-
+%% rtControlsDisplay
 function [pb_initialize, pb_startRT, pb_stopRT] = rtControlsDisplay(RT_status)
 
 % RT_status = initialized, running, stopped, completed.
